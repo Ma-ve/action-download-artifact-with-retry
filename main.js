@@ -6,6 +6,8 @@ const filesize = require('filesize')
 const pathname = require('path')
 const fs = require('fs')
 
+const sleep = dt => new Promise(resolve => setTimeout(resolve, dt))
+
 async function downloadAction(name, path) {
     const artifactClient = artifact.create()
     const downloadOptions = {
@@ -40,6 +42,7 @@ async function main() {
         let searchArtifacts = core.getBooleanInput("search_artifacts")
         const allowForks = core.getBooleanInput("allow_forks")
         let dryRun = core.getInput("dry_run")
+        let retryUntilArtifactExists = core.getInput("retry_until_artifact_exists")
 
         const client = github.getOctokit(token)
 
@@ -171,31 +174,39 @@ async function main() {
             }
         }
 
-        let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
-            owner: owner,
-            repo: repo,
-            run_id: runID,
-        })
-
-        // One artifact if 'name' input is specified, one or more if `name` is a regular expression, all otherwise.
-        if (name) {
-            filtered = artifacts.filter((artifact) => {
-                if (nameIsRegExp) {
-                    return artifact.name.match(name) !== null
-                }
-                return artifact.name == name
+        const maxLoops = retryUntilArtifactExists ? 12 : 1;
+        for (let i = 1; i <= maxLoops; i++) {
+            let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
+                owner: owner,
+                repo: repo,
+                run_id: runID,
             })
-            if (filtered.length == 0) {
-                core.info(`==> (not found) Artifact: ${name}`)
-                core.info('==> Found the following artifacts instead:')
-                for (const artifact of artifacts) {
-                    core.info(`\t==> (found) Artifact: ${artifact.name}`)
+
+            // One artifact if 'name' input is specified, one or more if `name` is a regular expression, all otherwise.
+            if (name) {
+                filtered = artifacts.filter((artifact) => {
+                    if (nameIsRegExp) {
+                        return artifact.name.match(name) !== null
+                    }
+                    return artifact.name == name
+                })
+                if (filtered.length == 0) {
+                    core.info(`==> (not found) Artifact: ${ name }`)
+                    core.info('==> Found the following artifacts instead:')
+                    for (const artifact of artifacts) {
+                        core.info(`\t==> (found) Artifact: ${ artifact.name }`)
+                    }
+                }
+                artifacts = filtered
+                if (filtered.length > 0) {
+                    core.setOutput("artifacts", artifacts)
+                    break
                 }
             }
-            artifacts = filtered
-        }
 
-        core.setOutput("artifacts", artifacts)
+            core.setOutput("artifacts", artifacts)
+            await sleep(5000)
+        }
 
         if (dryRun) {
             if (artifacts.length == 0) {
@@ -209,9 +220,9 @@ async function main() {
                 for (const artifact of artifacts) {
                     const size = filesize(artifact.size_in_bytes, { base: 10 })
                     core.info(`\t==> Artifact:`)
-                    core.info(`\t==> ID: ${artifact.id}`)
-                    core.info(`\t==> Name: ${artifact.name}`)
-                    core.info(`\t==> Size: ${size}`)
+                    core.info(`\t==> ID: ${ artifact.id }`)
+                    core.info(`\t==> Name: ${ artifact.name }`)
+                    core.info(`\t==> Size: ${ size }`)
                 }
                 return
             }
