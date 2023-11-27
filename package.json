@@ -1,5 +1,5 @@
 {
-  "name": "action-download-artifact",
+  "name": "action-download-artifact-with-retry",
   "main": "main.js",
   "dependencies": {
     "@actions/artifact": "^2.1.11",
