@@ -6,6 +6,8 @@ const filesize = require('filesize')
 const pathname = require('path')
 const fs = require('fs')
 
+const sleep = dt => new Promise(resolve => setTimeout(resolve, dt))
+
 async function downloadAction(name, path) {
     const artifactClient = artifact.create()
     const downloadOptions = {
@@ -40,6 +42,7 @@ async function main() {
         let searchArtifacts = core.getBooleanInput("search_artifacts")
         const allowForks = core.getBooleanInput("allow_forks")
         let dryRun = core.getInput("dry_run")
+        let retryUntilArtifactExists = core.getInput("retry_until_artifact_exists")
 
         const client = github.getOctokit(token)
 
@@ -74,6 +77,9 @@ async function main() {
                 throw new Error(`The following inputs cannot be used together: ${Object.keys(inputSet).join(", ")}`)
             }
         })
+        if (retryUntilArtifactExists && !name) {
+            throw new Error(`Must provide name when using retry_until_artifact_exists`);
+        }
 
         if (pr) {
             core.info(`==> PR: ${pr}`)
@@ -105,97 +111,107 @@ async function main() {
 
         core.info(`==> Allow forks: ${allowForks}`)
 
-        if (!runID) {
-            // Note that the runs are returned in most recent first order.
-            for await (const runs of client.paginate.iterator(client.rest.actions.listWorkflowRuns, {
-                owner: owner,
-                repo: repo,
-                workflow_id: workflow,
-                ...(branch ? { branch } : {}),
-                ...(event ? { event } : {}),
-                ...(commit ? { head_sha: commit } : {}),
-            }
-            )) {
-                for (const run of runs.data) {
-                    if (runNumber && run.run_number != runNumber) {
-                        continue
+
+        const maxLoops = retryUntilArtifactExists && !!name ? 12 : 1;
+        for (let i = 1; i <= maxLoops; i++) {
+
+            if (!runID) {
+                // Note that the runs are returned in most recent first order.
+                for await (const runs of client.paginate.iterator(client.rest.actions.listWorkflowRuns, {
+                        owner: owner,
+                        repo: repo,
+                        workflow_id: workflow,
+                        ...(branch ? { branch } : {}),
+                        ...(event ? { event } : {}),
+                        ...(commit ? { head_sha: commit } : {}),
                     }
-                    if (workflowConclusion && (workflowConclusion != run.conclusion && workflowConclusion != run.status)) {
-                        continue
-                    }
-                    if (!allowForks && run.head_repository.full_name !== `${owner}/${repo}`) {
-                        core.info(`==> Skipping run from fork: ${run.head_repository.full_name}`)
-                        continue
-                    }
-                    if (checkArtifacts || searchArtifacts) {
-                        let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
-                            owner: owner,
-                            repo: repo,
-                            run_id: run.id,
-                        })
-                        if (!artifacts || artifacts.length == 0) {
+                )) {
+                    for (const run of runs.data) {
+                        if (runNumber && run.run_number != runNumber) {
                             continue
                         }
-                        if (searchArtifacts) {
-                            const artifact = artifacts.find((artifact) => {
-                                if (nameIsRegExp) {
-                                    return artifact.name.match(name) !== null
-                                }
-                                return artifact.name == name
+                        if (workflowConclusion && (workflowConclusion != run.conclusion && workflowConclusion != run.status)) {
+                            continue
+                        }
+                        if (!allowForks && run.head_repository.full_name !== `${ owner }/${ repo }`) {
+                            core.info(`==> Skipping run from fork: ${ run.head_repository.full_name }`)
+                            continue
+                        }
+                        if (checkArtifacts || searchArtifacts) {
+                            let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
+                                owner: owner,
+                                repo: repo,
+                                run_id: run.id,
                             })
-                            if (!artifact) {
+                            if (!artifacts || artifacts.length == 0) {
                                 continue
                             }
+                            if (searchArtifacts) {
+                                const artifact = artifacts.find((artifact) => {
+                                    if (nameIsRegExp) {
+                                        return artifact.name.match(name) !== null
+                                    }
+                                    return artifact.name == name
+                                })
+                                if (!artifact) {
+                                    continue
+                                }
+                            }
                         }
+                        runID = run.id
+                        core.info(`==> (found) Run ID: ${ runID }`)
+                        core.info(`==> (found) Run date: ${ run.created_at }`)
+                        break
                     }
-                    runID = run.id
-                    core.info(`==> (found) Run ID: ${runID}`)
-                    core.info(`==> (found) Run date: ${run.created_at}`)
-                    break
-                }
-                if (runID) {
-                    break
+                    if (runID) {
+                        break
+                    }
                 }
             }
-        }
 
-        if (!runID) {
-            if (workflowConclusion && (workflowConclusion != 'in_progress')) {
-                return setExitMessage(ifNoArtifactFound, "no matching workflow run found with any artifacts?")
-            }
-
-            try {
-                return await downloadAction(name, path)
-            } catch (error) {
-                return setExitMessage(ifNoArtifactFound, "no matching artifact in this workflow?")
-            }
-        }
-
-        let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
-            owner: owner,
-            repo: repo,
-            run_id: runID,
-        })
-
-        // One artifact if 'name' input is specified, one or more if `name` is a regular expression, all otherwise.
-        if (name) {
-            filtered = artifacts.filter((artifact) => {
-                if (nameIsRegExp) {
-                    return artifact.name.match(name) !== null
+            if (!runID) {
+                if (workflowConclusion && (workflowConclusion != 'in_progress')) {
+                    return setExitMessage(ifNoArtifactFound, "no matching workflow run found with any artifacts?")
                 }
-                return artifact.name == name
+
+                try {
+                    return await downloadAction(name, path)
+                } catch (error) {
+                    return setExitMessage(ifNoArtifactFound, "no matching artifact in this workflow?")
+                }
+            }
+
+            let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
+                owner: owner,
+                repo: repo,
+                run_id: runID,
             })
-            if (filtered.length == 0) {
-                core.info(`==> (not found) Artifact: ${name}`)
-                core.info('==> Found the following artifacts instead:')
-                for (const artifact of artifacts) {
-                    core.info(`\t==> (found) Artifact: ${artifact.name}`)
+
+            // One artifact if 'name' input is specified, one or more if `name` is a regular expression, all otherwise.
+            if (name) {
+                filtered = artifacts.filter((artifact) => {
+                    if (nameIsRegExp) {
+                        return artifact.name.match(name) !== null
+                    }
+                    return artifact.name == name
+                })
+                if (filtered.length == 0) {
+                    core.info(`==> (not found) Artifact: ${ name }`)
+                    core.info('==> Found the following artifacts instead:')
+                    for (const artifact of artifacts) {
+                        core.info(`\t==> (found) Artifact: ${ artifact.name }`)
+                    }
+                }
+                artifacts = filtered
+                if (artifacts.length > 0) {
+                    core.setOutput("artifacts", artifacts)
+                    break
                 }
             }
-            artifacts = filtered
-        }
 
-        core.setOutput("artifacts", artifacts)
+            core.setOutput("artifacts", artifacts)
+            await sleep(5000)
+        }
 
         if (dryRun) {
             if (artifacts.length == 0) {
@@ -209,9 +225,9 @@ async function main() {
                 for (const artifact of artifacts) {
                     const size = filesize(artifact.size_in_bytes, { base: 10 })
                     core.info(`\t==> Artifact:`)
-                    core.info(`\t==> ID: ${artifact.id}`)
-                    core.info(`\t==> Name: ${artifact.name}`)
-                    core.info(`\t==> Size: ${size}`)
+                    core.info(`\t==> ID: ${ artifact.id }`)
+                    core.info(`\t==> Name: ${ artifact.name }`)
+                    core.info(`\t==> Size: ${ size }`)
                 }
                 return
             }

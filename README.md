@@ -11,9 +11,9 @@ Let's suppose you have a workflow with a job in it that at the end uploads an ar
 **Do not specify `pr`, `commit`, `branch`, `run_id` together or `workflow_conclusion` and `run_id` together. Pick just one of each or none.**
 
 ```yaml
-- name: Download artifact
-  id: download-artifact
-  uses: dawidd6/action-download-artifact@v2
+- name: Download artifact with retry
+  id: download-artifact-with-retry
+  uses: ma-ve/action-download-artifact-with-retry@v1
   with:
     # Optional, GitHub token, a Personal Access Token with `public_repo` scope if needed
     # Required, if the artifact is from a different repo

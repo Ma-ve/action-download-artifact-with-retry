@@ -1,6 +1,6 @@
-name: Download workflow artifact
+name: Download workflow artifact with retry
 description: Download and extract an artifact associated with given workflow and commit or other criteria
-author: dawidd6
+author: ma-ve
 branding:
   icon: download
   color: blue
@@ -81,6 +81,10 @@ inputs:
       
       fail, warn or ignore
     default: fail
+  retry_until_artifact_exists:
+    description: Choose to retry every 5 seconds until a matching artifact exists (max. 60 seconds)
+    required: false
+    default: false
 outputs:
   error_message:
     description: The error message, if an error occurs
