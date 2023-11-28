@@ -115,8 +115,10 @@ async function main() {
 
         core.info(`==> Allow forks: ${allowForks}`)
 
+        let artifacts = [];
 
         const maxLoops = retryUntilArtifactExists && !!name ? 12 : 1;
+        retryLoop:
         for (let i = 1; i <= maxLoops; i++) {
 
             if (!runID) {
@@ -185,7 +187,7 @@ async function main() {
                 }
             }
 
-            let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
+            artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
                 owner: owner,
                 repo: repo,
                 run_id: runID,
@@ -209,12 +211,15 @@ async function main() {
                 artifacts = filtered
                 if (artifacts.length > 0) {
                     core.setOutput("artifacts", artifacts)
-                    break
+
+                    break retryLoop;
                 }
                 runID = '';
             }
 
             core.setOutput("artifacts", artifacts)
+            core.info(`Waiting 5 seconds to find new runs...`)
+            core.info(``)
             await sleep(5000)
         }
 
