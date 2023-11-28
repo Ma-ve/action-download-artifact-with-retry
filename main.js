@@ -144,22 +144,22 @@ async function main() {
                             continue
                         }
                         if (checkArtifacts || searchArtifacts) {
-                            let artifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
+                            let runArtifacts = await client.paginate(client.rest.actions.listWorkflowRunArtifacts, {
                                 owner: owner,
                                 repo: repo,
                                 run_id: run.id,
                             })
-                            if (!artifacts || artifacts.length == 0) {
+                            if (!runArtifacts || runArtifacts.length == 0) {
                                 continue
                             }
                             if (searchArtifacts) {
-                                const artifact = artifacts.find((artifact) => {
+                                const runArtifact = runArtifacts.find((artifact) => {
                                     if (nameIsRegExp) {
                                         return artifact.name.match(name) !== null
                                     }
                                     return artifact.name == name
                                 })
-                                if (!artifact) {
+                                if (!runArtifact) {
                                     continue
                                 }
                             }
