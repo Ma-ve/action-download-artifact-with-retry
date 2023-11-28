@@ -77,8 +77,12 @@ async function main() {
                 "pr": pr,
                 "commit": commit,
                 "branch": branch,
-                "run_id": runID
-            }
+                "run_id": runID,
+            },
+            {
+                "run_id": runID,
+                "retry_until_artifact_exists": retryUntilArtifactExists,
+            },
         ]
         uniqueInputSets.forEach((inputSet) => {
             const inputs = Object.values(inputSet)
@@ -218,6 +222,7 @@ async function main() {
                     core.setOutput("artifacts", artifacts)
                     break
                 }
+                runID = '';
             }
 
             core.setOutput("artifacts", artifacts)
