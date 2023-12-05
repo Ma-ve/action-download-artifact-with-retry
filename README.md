@@ -1,4 +1,8 @@
-# Download workflow artifact GitHub Action
+# Download workflow artifact with retry GitHub Action
+
+**Addition**: adds `retry_until_artifact_exists`: retries every 5 seconds until specified artifact exists (max 60. seconds) (supported with `name` only)
+
+---
 
 An action that downloads and extracts uploaded artifacts associated with a given workflow and commit or other criteria.
 
@@ -75,4 +79,7 @@ Let's suppose you have a workflow with a job in it that at the end uploads an ar
     # Optional, ignore forks when searching for artifacts
     # default true
     allow_forks: false
+    # Optional, retries every 5 seconds until the artifact exists (max. 60 seconds) (with `name` only)
+    # default false
+    retry_until_artifact_exists: true
 ```
