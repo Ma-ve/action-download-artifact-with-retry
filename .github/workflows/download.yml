@@ -121,6 +121,7 @@ jobs:
         uses: ./
         with:
           workflow: upload.yml
+          name: artifacts
       - name: Test
         run: |
           cat artifact/sha | grep $GITHUB_SHA
