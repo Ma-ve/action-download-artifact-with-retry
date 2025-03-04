@@ -131,7 +131,8 @@ async function main() {
         retryLoop:
         for (let i = 1; i <= maxLoops; i++) {
             if (!runID) {
-                const runGetter = workflow ? client.rest.actions.listWorkflowRuns : client.rest.actions.listWorkflowRunsForRepo// Note that the runs are returned in most recent first order.
+                const runGetter = workflow ? client.rest.actions.listWorkflowRuns : client.rest.actions.listWorkflowRunsForRepo;
+                // Note that the runs are returned in most recent first order.
                 for await (const runs of client.paginate.iterator(runGetter, {
                         owner: owner,
                         repo: repo,
@@ -172,13 +173,15 @@ async function main() {
                                     continue
                                 }
                             }
+                        }
 
                         runID = run.id
                         core.info(`==> (found) Run ID: ${ runID }`)
-                        core.info(`==> (found) Run date: ${ run.created_at }`)if (!workflow) {
-                        workflow = await getWorkflow(client, owner, repo, runID)
-                        core.info(`==> (found) Workflow: ${workflow}`)
-                    }
+                        core.info(`==> (found) Run date: ${ run.created_at }`)
+                        if (!workflow) {
+                            workflow = await getWorkflow(client, owner, repo, runID)
+                            core.info(`==> (found) Workflow: ${ workflow }`)
+                        }
                         break
                     }
                     if (runID) {
