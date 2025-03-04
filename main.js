@@ -91,7 +91,7 @@ async function main() {
                 throw new Error(`The following inputs cannot be used together: ${Object.keys(inputSet).join(", ")}`)
             }
         })
-        if (retryUntilArtifactExists && !name) {
+        if (retryUntilArtifactExists) {
             if (!name) {
                 throw new Error(`Must provide name when using retry_until_artifact_exists`);
             }
