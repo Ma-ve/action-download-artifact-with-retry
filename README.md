@@ -17,7 +17,7 @@ Let's suppose you have a workflow with a job in it that at the end uploads an ar
 ```yaml
 - name: Download artifact with retry
   id: download-artifact-with-retry
-  uses: ma-ve/action-download-artifact-with-retry@v1
+  uses: ma-ve/action-download-artifact-with-retry@v2
   with:
     # Optional, GitHub token, a Personal Access Token with `public_repo` scope if needed
     # Required, if the artifact is from a different repo
@@ -26,6 +26,9 @@ Let's suppose you have a workflow with a job in it that at the end uploads an ar
     # Optional, workflow file name or ID
     # If not specified, will be inferred from run_id (if run_id is specified), or will be the current workflow
     workflow: workflow_name.yml
+    # If no workflow is set and workflow_search set to true, then the most recent workflow matching
+    # all other criteria will be looked up instead of using the current workflow
+    workflow_search: false
     # Optional, the status or conclusion of a completed workflow to search for
     # Can be one of a workflow conclusion:
     #   "failure", "success", "neutral", "cancelled", "skipped", "timed_out", "action_required"
@@ -76,10 +79,20 @@ Let's suppose you have a workflow with a job in it that at the end uploads an ar
     #  "fail", "warn", "ignore"
     # default fail
     if_no_artifact_found: fail
-    # Optional, ignore forks when searching for artifacts
-    # default true
-    allow_forks: false
+    # Optional, include forks when searching for artifacts
+    # default false
+    allow_forks: true
+    # Optional, choose to unpack the downloaded artifact(s) using `unzip` system utility
+    # default false
+    use_unzip: false
     # Optional, retries every 5 seconds until the artifact exists (max. 60 seconds) (with `name` only)
     # default false
     retry_until_artifact_exists: true
 ```
+
+## Troubleshooting
+
+### GLIBC_2.28 not found
+
+`v3` release of this action switched from `node16` to `node20` as runtime.
+Node 20 requires `glibc>=2.28`. If your self-hosted runner has older `glibc`, pin to `v2` release, but note it won't receive any updates.
