@@ -55,7 +55,7 @@ async function main() {
         let searchArtifacts = core.getBooleanInput("search_artifacts")
         const allowForks = core.getBooleanInput("allow_forks")
         let dryRun = core.getInput("dry_run")
-        let retryUntilArtifactExists = core.getInput("retry_until_artifact_exists")
+        let retryUntilArtifactExists = core.getBooleanInput("retry_until_artifact_exists")
 
         const client = github.getOctokit(token)
 
@@ -92,7 +92,10 @@ async function main() {
             }
         })
         if (retryUntilArtifactExists && !name) {
-            throw new Error(`Must provide name when using retry_until_artifact_exists`);
+            if (!name) {
+                throw new Error(`Must provide name when using retry_until_artifact_exists`);
+            }
+            core.info('==> Retrying until artifacts exists')
         }
 
         if (pr) {
