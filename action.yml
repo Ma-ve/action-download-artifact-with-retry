@@ -15,11 +15,18 @@ inputs:
 
       If not specified, will be inferred from run_id (if run_id is specified), or will be the current workflow
     required: false
+  workflow_search:
+    description: |
+      Most recent workflow matching all other criteria will be looked up instead of using the current workflow
+
+      https://docs.github.com/de/rest/actions/workflow-runs?apiVersion=2022-11-28#list-workflow-runs-for-a-repository
+    required: false
+    default: false
   workflow_conclusion:
     description: |
       Wanted status or conclusion to search for in recent runs
 
-      https://docs.github.com/en/free-pro-team@latest/rest/reference/actions#list-workflow-runs
+      https://docs.github.com/de/rest/actions/workflow-runs?apiVersion=2022-11-28#list-workflow-runs-for-a-workflow
     required: false
     default: success
   repo:
@@ -58,7 +65,7 @@ inputs:
   allow_forks:
     description: Allow forks
     required: false
-    default: true
+    default: false
   check_artifacts:
     description: Check workflow run whether it has an artifact
     required: false
@@ -78,9 +85,17 @@ inputs:
     required: false
     description: |
       Choose how to exit the action if no artifact is found
-      
+
       fail, warn or ignore
     default: fail
+  use_unzip:
+    description: Use system provided `unzip` utility instead of JS library for unpacking
+    required: false
+    default: false
+  merge_multiple:
+    description: If multiple artifacts are found with `name_is_regexp` set to `true`, merge them into one directory
+    required: false
+    default: false
   retry_until_artifact_exists:
     description: Choose to retry every 5 seconds until a matching artifact exists (max. 60 seconds)
     required: false
@@ -96,5 +111,5 @@ outputs:
   artifacts:
     description: JSON array with details about found artifacts
 runs:
-  using: node16
+  using: node20
   main: main.js
